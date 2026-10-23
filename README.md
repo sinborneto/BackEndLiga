@@ -104,6 +104,8 @@ Estoque aceita múltiplos glifos separados por `;`, assim como preços; `V` é s
 
 ## Recursos e falhas
 
+Condições (`quality`): `1 → M`, `2 → NM`, `3 → SP`, `4 → MP`, `5 → HP`, `6 → D`; `0 → Não definida`. Mapeamento confirmado em 23/10/2026 nos seletores `#collection_quality` e `#bazar_quality` do portal, usando Pikachu (12/17) como referência para HP. O código bruto continua em `qualityCode` e códigos desconhecidos retornam `null`. O filtro `quality` aceita as siglas, sem diferenciar maiúsculas e minúsculas, tanto na consulta individual quanto no lote.
+
 Chromium reutilizado; contexto isolado por coleta; três páginas simultâneas por padrão; fila limitada; cache de até 200 consultas; TTL 10 minutos; consultas concorrentes à mesma carta compartilham a coleta; filtros aplicados depois do cache. Rate limit: 30 requisições/minuto/IP. Não configure confiança em proxy sem conhecer a infraestrutura. SIGINT/SIGTERM encerram o servidor e o navegador.
 
 Variáveis em `.env.example`: porta, TTL, limite de páginas, timeout de navegação/espera e caminho dos perfis. Use valores positivos. Execute a partir da raiz do projeto para carregar os arquivos JSON de calibração.

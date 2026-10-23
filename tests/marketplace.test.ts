@@ -81,8 +81,42 @@ describe("marketplace e sprites", () => {
     [0, "Não definida"],
     [1, "M"],
     [2, "NM"],
+    [3, "SP"],
+    [4, "MP"],
+    [5, "HP"],
+    [6, "D"],
     [99, null],
-  ])("qualidade %s", (c, label) => expect(mapQuality(c)).toBe(label));
+  ])("qualidade %s", (c, label) => {
+    expect(mapQuality(c)).toBe(label);
+    expect(mapQuality(String(c))).toBe(label);
+  });
+  it("mapeia condições das ofertas e filtra por SP, MP, HP e D", () => {
+    const raw = [
+      { id: 1, lj_id: 1, qualid: 3, preco: 5 },
+      { id: 2, lj_id: 1, qualid: "4", preco: 4 },
+      { id: 3, lj_id: 1, qualid: 5, preco: 199 },
+      { id: 4, lj_id: 1, qualid: "6", preco: 5 },
+      { id: 5, lj_id: 1, qualid: 99, preco: 1 },
+    ];
+    const offers = mapOffers(raw, {}, context());
+    expect(offers.map(o => [o.quality, o.qualityCode])).toEqual([
+      ["SP", 3], ["MP", "4"], ["HP", 5], ["D", "6"], [null, 99],
+    ]);
+    const result = resultSchema.parse({
+      card: { name: "Pikachu", number: null, edition: null },
+      source: "Liga Pokémon", collectedAt: "2026-10-23T12:00:00.000Z",
+      totalOffers: offers.length, offers,
+      diagnostics: { pricesDecoded: 5, pricesPending: 0, stocksDecoded: 0, stocksPending: 5, messages: [] },
+    });
+    for (const [index, quality] of ["SP", "MP", "HP", "D"].entries()) {
+      const filtered = filterResult(result, querySchema.parse({ card: "Pikachu", quality: quality.toLowerCase() }));
+      expect(filtered.totalOffers).toBe(1);
+      expect(filtered.offers[0]).toMatchObject({ offerId: index + 1, quality });
+    }
+    expect(result.offers).toHaveLength(5);
+    expect(mapQuality(null)).toBeNull();
+    expect(mapQuality(undefined)).toBeNull();
+  });
   it.each([
     [0, "Normal"],
     [2, "Foil"],

@@ -1,7 +1,12 @@
+// Validado em 23/10/2026 nos option[value] de #collection_quality e #bazar_quality.
 const quality: Record<string, string> = {
   "0": "Não definida",
   "1": "M",
   "2": "NM",
+  "3": "SP",
+  "4": "MP",
+  "5": "HP",
+  "6": "D",
 };
 const finish: Record<string, string> = {
   "0": "Normal",
