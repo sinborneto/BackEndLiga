@@ -92,6 +92,16 @@ it("normaliza número separado e número no nome para a mesma busca no portal", 
   expect(querySchema.safeParse({ card: "Pikachu (1/9)", number: "12/17" }).success).toBe(false);
 });
 
+it("confirma no DOM a identidade ignorando zeros à esquerda", async () => {
+  const page = await browser.newPage();
+  try {
+    await page.setContent('<title>Pikachu (01/09)</title><h1>Pikachu (01/09)</h1><span class="sigla-edition">WC</span>');
+    await page.evaluate(() => { window.cards_stock = []; });
+    await expect(resolveCard(page, querySchema.parse({ card: "Pikachu", number: "001/009" }))).resolves.toMatchObject({ name: "Pikachu", edition: "WC" });
+    await expect(resolveCard(page, querySchema.parse({ card: "Pikachu", number: "1/10" }))).rejects.toMatchObject({ code: "CARD_UNVERIFIED" });
+  } finally { await page.close(); }
+});
+
 it("extrai imagem principal e o endereço real da carta, sem usar anúncios", async () => {
   const page = await browser.newPage();
   const url = buildCardUrl("Articuno (132/128)");

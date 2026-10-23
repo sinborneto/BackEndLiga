@@ -1,5 +1,6 @@
 import type { Page } from "playwright";
 import { ApiError, type CardQuery } from "../types/card.types.js";
+import { normalizeCardNumber } from "../utils/card-number.js";
 export function buildCardUrl(card: string) {
   const url = new URL("https://www.ligapokemon.com.br/");
   url.search = new URLSearchParams({
@@ -68,7 +69,7 @@ export async function resolveCard(page: Page, q: CardQuery) {
         (!q.edition ||
           c.label.toLowerCase().includes(q.edition.toLowerCase()) ||
           new URL(c.url).searchParams.get("ed") === q.edition) &&
-        (!q.number || c.label.includes(q.number)),
+        (!q.number || [...c.label.matchAll(/\d+(?:\/\d+)?/g)].some(match => normalizeCardNumber(match[0]) === normalizeCardNumber(q.number!))),
     );
     if (matching.length === 1) {
       await page.goto(matching[0].url, { waitUntil: "domcontentloaded" });
@@ -90,6 +91,7 @@ export async function resolveCard(page: Page, q: CardQuery) {
     /\((\d+\/\d+)\)/.exec(q.card)?.[1] ??
     /\((\d+\/\d+)\)/.exec(await page.title())?.[1] ??
     null;
+  const normalizedBody = bodyNumberText(await page.locator("body").innerText());
   // Confirma a identificação na página; não usa o pedido como prova de edição.
   const body = await page.locator("body").innerText();
   if (q.edition && !body.toLowerCase().includes(q.edition.toLowerCase()))
@@ -101,7 +103,7 @@ export async function resolveCard(page: Page, q: CardQuery) {
     );
   if (
     !body.toLowerCase().includes(name.toLowerCase()) ||
-    (number && !body.includes(number))
+    (number && !normalizedBody.includes(normalizeCardNumber(number)))
   )
     throw new ApiError(
       502,
@@ -134,4 +136,7 @@ export async function resolveCard(page: Page, q: CardQuery) {
       candidates,
     );
   return { name, number, edition: edition[0] ?? null };
+}
+function bodyNumberText(text: string): string[] {
+  return [...text.matchAll(/\d+(?:\/\d+)?/g)].map(match => normalizeCardNumber(match[0]));
 }

@@ -12,11 +12,13 @@ import {
 } from "../types/batch.types.js";
 import { ConcurrencyLimiter } from "../utils/concurrency.js";
 import { filterResult } from "./marketplace.service.js";
+import { normalizeCardNumber } from "../utils/card-number.js";
 export function cardKey(q: CardQuery) {
+  const number = q.number ?? /\((\d+(?:\/\d+)?)\)\s*$/.exec(q.card)?.[1];
   return JSON.stringify([
-    q.card.trim().replace(/\s+/g, " ").toLowerCase(),
+    (number ? q.card.replace(/\s*\(\d+(?:\/\d+)?\)\s*$/, "") : q.card).trim().replace(/\s+/g, " ").toLowerCase(),
     q.edition?.toLowerCase() ?? "",
-    q.number ?? /\((\d+(?:\/\d+)?)\)$/.exec(q.card)?.[1] ?? "",
+    number ? normalizeCardNumber(number) : "",
   ]);
 }
 export function statistics(offers: Offer[]) {

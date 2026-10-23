@@ -15,6 +15,8 @@ import {
 import { buildCardUrl, resolveCard, extractCardMedia } from "./card-search.service.js";
 import { mapOffers } from "./marketplace.service.js";
 import { cardKey } from "./batch-prices.service.js";
+import { collectNumberVariants } from "./number-variants.service.js";
+import { normalizeCardNumber } from "../utils/card-number.js";
 const profilesSchema = z.array(
   z.object({
     sha256: z.string().regex(/^[a-f0-9]{64}$/),
@@ -36,7 +38,7 @@ export class LigaPokemonService {
   ) {}
   getPrices(q: CardQuery) {
     const key = cardKey(q);
-    return this.cache.get(key, () => this.collect(q));
+    return this.cache.get(key, () => collectNumberVariants(q, variant => this.collect(variant)));
   }
   private async collect(q: CardQuery): Promise<Result> {
     return this.pool.run(async (page) => {
@@ -77,7 +79,7 @@ export class LigaPokemonService {
           ...new Set(raw.offers.map((o) => o.idEdicao).filter(Boolean)),
         ];
         const numbers = [
-          ...new Set(raw.offers.map((o) => o.num).filter(Boolean)),
+          ...new Set(raw.offers.map((o) => o.num).filter(value => value !== undefined && value !== null).map(value => normalizeCardNumber(String(value)))),
         ];
         if (editions.length > 1 || numbers.length > 1)
           throw new ApiError(
@@ -89,7 +91,7 @@ export class LigaPokemonService {
         if (
           q.number &&
           numbers.length &&
-          String(numbers[0]) !== q.number.split("/")[0]
+          normalizeCardNumber(String(numbers[0])) !== normalizeCardNumber(q.number.split("/")[0])
         )
           throw new ApiError(
             409,

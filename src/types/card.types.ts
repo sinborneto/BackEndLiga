@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { normalizeCardNumber } from "../utils/card-number.js";
 export const qualityFilterSchema = z.string().trim()
   .regex(/^(?:M|NM|SP|MP|HP|D)(?:\s*,\s*(?:M|NM|SP|MP|HP|D))*$/i, "Condições válidas: M, NM, SP, MP, HP e D, separadas por vírgula.")
   .transform(value => [...new Set(value.toUpperCase().split(",").map(item => item.trim()))].join(","));
@@ -31,7 +32,7 @@ export const querySchema = z
   )
   .superRefine((query, ctx) => {
     const embedded = /\((\d+(?:\/\d+)?)\)\s*$/.exec(query.card)?.[1];
-    if (query.number && embedded && query.number !== embedded) {
+    if (query.number && embedded && normalizeCardNumber(query.number) !== normalizeCardNumber(embedded)) {
       ctx.addIssue({ code: "custom", path: ["number"], message: "O número no nome da carta difere do campo number." });
     }
   })
@@ -59,6 +60,7 @@ export const offerSchema = z.object({
   offerId: z.number().int().nullable(),
   storeId: z.number().int().nullable(),
   store: z.string().nullable(),
+  storeLogoUrl: z.url().nullable().optional(),
   city: z.string().nullable(),
   state: z.string().nullable(),
   price: z.number().nonnegative().nullable(),

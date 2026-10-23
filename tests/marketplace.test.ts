@@ -23,6 +23,21 @@ const context = (): SpriteContext => ({
   fingerprints,
 });
 describe("marketplace e sprites", () => {
+  it("usa o logotipo do comparador e mantém ausência sem inventar imagens", () => {
+    const offers = mapOffers([
+      {id:1,lj_id:1}, {id:2,lj_id:2}, {id:3,lj_id:3}, {id:4,lj_id:4},
+    ], {
+      "1": {lj_path: "242400_1773702831.jpg", lj_avatar: "outro-avatar.jpg"},
+      "2": {lj_avatar: "somente-avatar.jpg"},
+      "3": {lj_path: "https://example.com/logo.jpg"},
+      "4": {lj_path: "../logo.jpg"},
+    }, context());
+    expect(offers.map(offer => offer.storeLogoUrl)).toEqual([
+      "https://repositorio.sbrauble.com/arquivos/up/ecom/comparador/242400_1773702831.jpg", null, null, null,
+    ]);
+    const real = mapOffers(fixture.raw.offers, fixture.raw.stores, context());
+    expect(real[0].storeLogoUrl).toBe("https://repositorio.sbrauble.com/arquivos/up/ecom/comparador/242400_1773702831.jpg");
+  });
   it("preserva leilão sem inventar loja, estoque ou preço unitário", () => {
     const ctx = context();
     const result = mapOffers(

@@ -17,6 +17,11 @@ const numeric = (v: unknown) => {
 const text = (v: unknown) => (typeof v === "string" && v.trim() ? v : null);
 const code = (v: unknown) =>
   typeof v === "string" || typeof v === "number" ? v : null;
+// lj_path is the comparator logo filename used by .store-name img on the portal.
+function storeLogoUrl(value: unknown): string | null {
+  if (typeof value !== "string" || !/^[a-z0-9][a-z0-9._-]*\.(?:jpe?g|png|webp|gif|avif|svg)$/i.test(value)) return null;
+  return new URL(value, "https://repositorio.sbrauble.com/arquivos/up/ecom/comparador/").href;
+}
 export function mapOffers(
   raw: RawOffer[],
   stores: Record<string, Record<string, unknown>>,
@@ -40,6 +45,7 @@ export function mapOffers(
       offerId: o.id ?? null,
       storeId: o.lj_id ?? null,
       store: text(s.lj_name ?? s.nome ?? s.name ?? s.lj_nome),
+      storeLogoUrl: storeLogoUrl(s.lj_path),
       city: text(s.lj_cidade ?? s.cidade ?? s.city),
       state: text(s.lj_uf ?? s.estado ?? s.uf ?? s.state ?? o.lj_uf),
       price:
