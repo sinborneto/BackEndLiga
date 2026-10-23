@@ -124,6 +124,7 @@ export class BatchPricesService {
         successfulCards: successful.length,
         failedCards: results.length - successful.length,
         totalOffers: successful.reduce((sum, r) => sum + r.totalOffers, 0),
+        totalAuctions: successful.reduce((sum,r) => sum + (r.totalAuctions ?? 0),0),
         durationMs: Math.round(performance.now() - start),
       },
       results,

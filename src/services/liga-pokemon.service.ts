@@ -17,6 +17,7 @@ import { mapOffers } from "./marketplace.service.js";
 import { cardKey } from "./batch-prices.service.js";
 import { collectNumberVariants } from "./number-variants.service.js";
 import { normalizeCardNumber } from "../utils/card-number.js";
+import { isAuction, mapAuctions } from "../mappers/auctions.js";
 const profilesSchema = z.array(
   z.object({
     sha256: z.string().regex(/^[a-f0-9]{64}$/),
@@ -106,17 +107,20 @@ export class LigaPokemonService {
             ),
           ),
         );
-        const ctx = await extractSprites(page, raw.offers, profiles);
+        const ctx = await extractSprites(page, raw.offers.filter(offer => !isAuction(offer)), profiles);
         ctx.fingerprints = z
           .record(z.string().regex(/^[a-f0-9]{64}$/), z.string().regex(/^\d$/))
           .parse(JSON.parse(await readFile("glyph-fingerprints.json", "utf8")));
         const offers = mapOffers(raw.offers, raw.stores, ctx);
+        const auctions = mapAuctions(raw.offers);
         return resultSchema.parse({
           card: { ...card, ...media },
           source: "Liga Pokémon",
           totalOffers: offers.length,
           collectedAt: new Date().toISOString(),
           offers,
+          auctions,
+          totalAuctions: auctions.length,
           diagnostics: {
             pricesDecoded: offers.filter((o) => o.price !== null).length,
             pricesPending: offers.filter((o) => o.price === null).length,

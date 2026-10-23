@@ -76,6 +76,26 @@ export const offerSchema = z.object({
   storeUrl: z.url().nullable().optional(),
 });
 export type Offer = z.infer<typeof offerSchema>;
+export const auctionSchema = z.object({
+  auctionId: z.number().int().nullable(),
+  title: z.string().nullable(),
+  bidPrice: z.number().nonnegative().nullable(),
+  fixedPrice: z.number().nonnegative().nullable(),
+  bidIncrement: z.number().nonnegative().nullable(),
+  bids: z.number().int().nonnegative().nullable(),
+  endsAt: z.iso.datetime().nullable(),
+  seller: z.string().nullable(),
+  sellerUrl: z.url().nullable(),
+  state: z.string().nullable(),
+  referencesCount: z.number().int().nonnegative().nullable(),
+  positivePercent: z.number().min(0).max(100).nullable(),
+  acceptsLigaSegura: z.boolean().nullable(),
+  quality: z.string().nullable(),
+  finish: z.string().nullable(),
+  language: z.string().nullable(),
+  url: z.url().nullable(),
+});
+export type Auction = z.infer<typeof auctionSchema>;
 export const resultSchema = z.object({
   card: z.object({
     name: z.string(),
@@ -88,6 +108,8 @@ export const resultSchema = z.object({
   totalOffers: z.number().int(),
   collectedAt: z.iso.datetime(),
   offers: z.array(offerSchema),
+  auctions: z.array(auctionSchema).optional(),
+  totalAuctions: z.number().int().nonnegative().optional(),
   diagnostics: z.object({
     pricesDecoded: z.number(),
     pricesPending: z.number(),

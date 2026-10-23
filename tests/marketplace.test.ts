@@ -42,7 +42,7 @@ describe("marketplace e sprites", () => {
     ], {}, context());
     expect(offers[0].url).toContain("view=mp%2Fshowcase%2Fhome");
     expect(offers[0].storeUrl).toBe("https://www.ligapokemon.com.br/b/?p=e33426078");
-    expect(offers[1].storeUrl).toBeNull(); expect(offers[2].storeUrl).toBeNull();
+    expect(offers).toHaveLength(2); expect(offers[1].storeUrl).toBeNull();
   });
   it("usa o logotipo do comparador e mantém ausência sem inventar imagens", () => {
     const offers = mapOffers([
@@ -59,7 +59,7 @@ describe("marketplace e sprites", () => {
     const real = mapOffers(fixture.raw.offers, fixture.raw.stores, context());
     expect(real[0].storeLogoUrl).toBe("https://repositorio.sbrauble.com/arquivos/up/ecom/comparador/242400_1773702831.jpg");
   });
-  it("preserva leilão sem inventar loja, estoque ou preço unitário", () => {
+  it("não inclui leilões nas ofertas de lojas nem nos diagnósticos de preços", () => {
     const ctx = context();
     const result = mapOffers(
       [
@@ -73,14 +73,8 @@ describe("marketplace e sprites", () => {
       {},
       ctx,
     );
-    expect(result[0]).toMatchObject({
-      offerId: 5639374,
-      storeId: null,
-      price: null,
-      stock: null,
-      url: null,
-    });
-    expect(ctx.diagnostics[0]).toContain("leilão");
+    expect(result).toEqual([]);
+    expect(ctx.diagnostics).toEqual([]);
   });
   it("decodifica todas as 81 ofertas reais preservadas em fixture", () => {
     const offers = mapOffers(fixture.raw.offers, fixture.raw.stores, context());

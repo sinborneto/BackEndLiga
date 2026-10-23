@@ -10,6 +10,7 @@ import {
   type SpriteContext,
 } from "../extractors/sprite.decoder.js";
 import { mapQuality, mapFinish, mapLanguage } from "../mappers/attributes.js";
+import { isAuction } from "../mappers/auctions.js";
 const numeric = (v: unknown) => {
   const n = typeof v === "string" && /^\d+(?:\.\d+)?$/.test(v) ? Number(v) : v;
   return typeof n === "number" && Number.isFinite(n) && n >= 0 ? n : null;
@@ -27,11 +28,7 @@ export function mapOffers(
   stores: Record<string, Record<string, unknown>>,
   ctx: SpriteContext,
 ): Offer[] {
-  return raw.map((o) => {
-    if (o.sellType === 2)
-      ctx.diagnostics.push(
-        "Registro de leilão preservado sem preço unitário/estoque de loja; campos de lance não são tratados como preço atual.",
-      );
+  return raw.filter(o => !isAuction(o)).map((o) => {
     const s = stores[String(o.lj_id)] ?? {};
     const url = new URL("https://www.ligapokemon.com.br/");
     url.search = new URLSearchParams({
@@ -82,6 +79,7 @@ export function filterResult(result: Result, q: CardQuery): Result {
         (o.price !== null && o.price >= q.minPrice)) &&
       (q.maxPrice === undefined || (o.price !== null && o.price <= q.maxPrice)),
   );
+  const auctions = result.auctions?.filter(auction => matches(auction.quality,q.quality) && matches(auction.finish,q.finish) && matches(auction.language,q.language) && matches(auction.state,q.state));
   offers.sort((a, b) => {
     const x = q.sort === "stock_desc" ? a.stock : a.price,
       y = q.sort === "stock_desc" ? b.stock : b.price;
@@ -95,5 +93,5 @@ export function filterResult(result: Result, q: CardQuery): Result {
           ? x - y
           : y - x;
   });
-  return { ...result, offers, totalOffers: offers.length };
+  return { ...result, offers, totalOffers: offers.length, ...(auctions ? {auctions,totalAuctions:auctions.length} : {}) };
 }

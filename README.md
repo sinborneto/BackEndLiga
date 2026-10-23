@@ -16,7 +16,11 @@ Para produção local: `npm run build` e `npm start`. Verificações: `npm test`
 
 ## Consultar
 
-As ofertas mantêm `url` para a vitrine na Liga e incluem `storeUrl` para o produto na loja, via redirecionamento oficial `https://www.ligapokemon.com.br/b/?p=e<ID da oferta>` usado pelo botão “Ir à Loja” do portal. Esse segundo link é `null` em leilões ou quando faltam identificadores válidos. O destino externo é resolvido pela Liga no navegador, sem uma requisição adicional por oferta durante a coleta.
+Leilões (`sellType=2` na Liga) ficam exclusivamente em `auctions`, com contagem em `totalAuctions`; `offers` e `totalOffers` incluem somente ofertas de lojas. Cada leilão informa título, `bidPrice` (valor de lance anunciado, inicial quando `bids=0`), `fixedPrice`, `bidIncrement`, `bids`, `endsAt` em ISO UTC, vendedor/perfil, UF, referências, percentual positivo quando houver referências, condição, acabamento, idioma, aceitação de LigaSegura e link oficial do anúncio. Preço de lance ou incremento igual a zero é tratado como modalidade indisponível, não como oferta gratuita. Datas do portal usam Brasília (UTC−03:00), validado pelo encerramento exibido; anúncios já encerrados são omitidos na coleta. Valores ausentes continuam `null`.
+
+Os filtros de condição, acabamento, idioma e UF se aplicam às duas listas. Preços mínimo/máximo e estoque mínimo se aplicam somente às lojas, pois lances não são preços unitários e leilões não possuem estoque de loja. Estatísticas de preços/estoque/lojas e diagnósticos de decodificação consideram somente as ofertas de lojas. No lote, cada resultado traz as duas listas e o resumo separa `totalOffers` de `totalAuctions`.
+
+As ofertas mantêm `url` para a vitrine na Liga e incluem `storeUrl` para o produto na loja, via redirecionamento oficial `https://www.ligapokemon.com.br/b/?p=e<ID da oferta>` usado pelo botão “Ir à Loja” do portal. Esse segundo link é `null` quando faltam identificadores válidos. Leilões têm seu próprio `url` em `auctions`. O destino externo é resolvido pela Liga no navegador, sem uma requisição adicional por oferta durante a coleta.
 
 Cada oferta inclui `storeLogoUrl`, com o logotipo do comparador identificado por `cards_stores[storeId].lj_path` e hospedado no repositório de imagens usado pelo portal. Arquivos ausentes ou inválidos retornam `null`; não se usa o avatar como se fosse o logotipo. O campo está disponível nos resultados individuais e em lote.
 
@@ -128,7 +132,7 @@ Erros: 400 parâmetros inválidos; 404 carta inexistente identificada no conteú
 
 Em 22/10/2026, consulta real de Articuno (132/128), 30C: **81 ofertas, 81 preços e 81 estoques decodificados**, zero pendências. Inclui lojas, cidade, UF e descontos. Dados brutos de uma captura estão em `tests/fixtures/articuno.json`; o número 81 é esperado somente nesse snapshot. `npx tsx scripts/live.ts` repete a consulta real e grava `artifacts/live-result.json` (depende da disponibilidade do portal).
 
-Também validado ao vivo: `npx tsx scripts/live.ts "Pikachu (025/165)"` identifica edição MEW e recupera 124 registros: 122 ofertas de loja com preço/estoque decodificados e 2 leilões. Os leilões são preservados com loja, preço unitário e estoque desconhecidos; valores de lances não são convertidos em preço de loja. A calibração adicional validou os dez dígitos nos dois estilos de sprite. Os totais e disponibilidades podem mudar.
+Validação histórica de `npx tsx scripts/live.ts "Pikachu (025/165)"`: edição MEW com 124 registros, sendo 122 ofertas de loja e 2 leilões. Na versão atual, os leilões ficam na lista `auctions`, com campos próprios, e somente as lojas ficam em `offers`. A calibração adicional validou os dez dígitos nos dois estilos de sprite. Os totais e disponibilidades podem mudar.
 
 Testes locais cobrem extração no Chromium, sprites, múltiplos dígitos, permutação de classes, hash desconhecido, descontos, relacionamentos, códigos conhecidos/desconhecidos, filtros, ordenação, cache, validação HTTP, inexistência, candidatos e timeout. Não fazem chamadas externas.
 

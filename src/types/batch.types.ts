@@ -78,6 +78,7 @@ export const batchResultSchema = z.object({
     successfulCards: z.number().int(),
     failedCards: z.number().int(),
     totalOffers: z.number().int(),
+    totalAuctions: z.number().int().nonnegative().optional(),
     durationMs: z.number().nonnegative(),
   }),
   results: z.array(

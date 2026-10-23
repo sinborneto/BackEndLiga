@@ -11,6 +11,7 @@ const quality: Record<string, string> = {
 const finish: Record<string, string> = {
   "0": "Normal",
   "2": "Foil",
+  "14": "Foil Promo",
   "34": "Foil Alterada",
 };
 export const mapQuality = (code: unknown) => quality[String(code)] ?? null;
