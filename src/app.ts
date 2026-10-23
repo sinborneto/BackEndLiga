@@ -10,10 +10,16 @@ import { filterResult } from "./services/marketplace.service.js";
 import { BatchPricesService } from "./services/batch-prices.service.js";
 import { createBatchSchema } from "./types/batch.types.js";
 import type { CatalogProvider } from "./services/catalog.service.js";
+import { ThumbnailService } from "./services/thumbnail.service.js";
 export interface PriceService {
   getPrices(q: CardQuery): Promise<Result>;
+  searchPage?(cursor: string): Promise<unknown>;
 }
-export function createApp(service: PriceService, catalog?: CatalogProvider) {
+export function createApp(
+  service: PriceService,
+  catalog?: CatalogProvider,
+  thumbnails = new ThumbnailService(),
+) {
   const positive = (value: string | undefined, fallback: number) => {
     const n = Number(value ?? fallback);
     if (!Number.isInteger(n) || n < 1)
@@ -29,6 +35,26 @@ export function createApp(service: PriceService, catalog?: CatalogProvider) {
   );
   const app = express();
   app.disable("x-powered-by");
+  app.get(
+    "/api/images/thumbnail",
+    rateLimit({ windowMs: 60000, limit: 300 }),
+    async (req, res, next) => {
+      try {
+        if (typeof req.query.src !== "string")
+          throw new ApiError(400, "INVALID_IMAGE", "Informe a imagem.");
+        const image = await thumbnails.get(req.query.src);
+        res
+          .set({
+            "Content-Type": "image/webp",
+            "Cache-Control": "public, max-age=86400, immutable",
+            "X-Content-Type-Options": "nosniff",
+          })
+          .send(image);
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
   app.use(rateLimit({ windowMs: 60000, limit: 30 }));
   app.use(express.json({ limit: "128kb" }));
   app.post("/api/cards/prices/batch", async (req, res, next) => {
@@ -78,6 +104,15 @@ export function createApp(service: PriceService, catalog?: CatalogProvider) {
       next(error);
     }
   });
+  app.get("/api/cards/search-page", async (req, res, next) => {
+    try {
+      if (typeof req.query.cursor !== "string" || !service.searchPage)
+        throw new ApiError(400, "INVALID_CURSOR", "Página inválida.");
+      res.json(await service.searchPage(req.query.cursor));
+    } catch (error) {
+      next(error);
+    }
+  });
   app.get("/api/cards/prices", async (req, res, next) => {
     const parsed = querySchema.safeParse(req.query);
     if (!parsed.success) {
@@ -111,6 +146,7 @@ export function createApp(service: PriceService, catalog?: CatalogProvider) {
           error: error.code,
           message: error.message,
           details: error.details,
+          ...(error.pagination ? { pagination: error.pagination } : {}),
         });
       } else {
         console.error(error);

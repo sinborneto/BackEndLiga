@@ -12,12 +12,18 @@ import {
   extractStructures,
   extractSprites,
 } from "../extractors/cards.extractor.js";
-import { buildCardUrl, resolveCard, extractCardMedia } from "./card-search.service.js";
+import {
+  buildCardUrl,
+  resolveCard,
+  extractCardMedia,
+} from "./card-search.service.js";
 import { mapOffers } from "./marketplace.service.js";
 import { cardKey } from "./batch-prices.service.js";
 import { collectNumberVariants } from "./number-variants.service.js";
 import { normalizeCardNumber } from "../utils/card-number.js";
 import { isAuction, mapAuctions } from "../mappers/auctions.js";
+import { PortalLimit } from "./portal-limit.js";
+import { SearchPagesService } from "./search-pages.service.js";
 const profilesSchema = z.array(
   z.object({
     sha256: z.string().regex(/^[a-f0-9]{64}$/),
@@ -28,6 +34,8 @@ const profilesSchema = z.array(
   }),
 );
 export class LigaPokemonService {
+  private readonly portalLimit = new PortalLimit();
+  private readonly searchPages = new SearchPagesService(this.portalLimit);
   constructor(
     private pool = new BrowserPool(
       Number(process.env.MAX_PAGES ?? 3),
@@ -37,16 +45,28 @@ export class LigaPokemonService {
       Number(process.env.CACHE_TTL_MS ?? 600000),
     ),
   ) {}
-  getPrices(q: CardQuery) {
+  async getPrices(q: CardQuery) {
+    if (!q.number && !q.edition) {
+      const choices = await this.searchPages.first(q);
+      if (choices) throw choices;
+    }
     const key = cardKey(q);
-    return this.cache.get(key, () => collectNumberVariants(q, variant => this.collect(variant)));
+    return this.cache.get(key, () =>
+      collectNumberVariants(q, (variant) => this.collect(variant)),
+    );
   }
   private async collect(q: CardQuery): Promise<Result> {
+    this.portalLimit.assertAvailable();
     return this.pool.run(async (page) => {
       try {
-        const response = await page.goto(buildCardUrl(q.card, q.edition, q.number), {
-          waitUntil: "domcontentloaded",
-        });
+        this.portalLimit.assertAvailable();
+        const response = await page.goto(
+          buildCardUrl(q.card, q.edition, q.number),
+          {
+            waitUntil: "domcontentloaded",
+          },
+        );
+        this.portalLimit.check(response);
         if (response?.status() === 403) {
           await page
             .waitForFunction(
@@ -69,7 +89,7 @@ export class LigaPokemonService {
             "O portal retornou um erro HTTP.",
             { status: response?.status() },
           );
-        const card = await resolveCard(page, q);
+        const card = await resolveCard(page, q, this.portalLimit);
         await page.waitForFunction(
           () =>
             Array.isArray(window.cards_stock) && window.cards_stores != null,
@@ -80,7 +100,12 @@ export class LigaPokemonService {
           ...new Set(raw.offers.map((o) => o.idEdicao).filter(Boolean)),
         ];
         const numbers = [
-          ...new Set(raw.offers.map((o) => o.num).filter(value => value !== undefined && value !== null).map(value => normalizeCardNumber(String(value)))),
+          ...new Set(
+            raw.offers
+              .map((o) => o.num)
+              .filter((value) => value !== undefined && value !== null)
+              .map((value) => normalizeCardNumber(String(value))),
+          ),
         ];
         if (editions.length > 1 || numbers.length > 1)
           throw new ApiError(
@@ -92,7 +117,8 @@ export class LigaPokemonService {
         if (
           q.number &&
           numbers.length &&
-          normalizeCardNumber(String(numbers[0])) !== normalizeCardNumber(q.number.split("/")[0])
+          normalizeCardNumber(String(numbers[0])) !==
+            normalizeCardNumber(q.number.split("/")[0])
         )
           throw new ApiError(
             409,
@@ -107,7 +133,11 @@ export class LigaPokemonService {
             ),
           ),
         );
-        const ctx = await extractSprites(page, raw.offers.filter(offer => !isAuction(offer)), profiles);
+        const ctx = await extractSprites(
+          page,
+          raw.offers.filter((offer) => !isAuction(offer)),
+          profiles,
+        );
         ctx.fingerprints = z
           .record(z.string().regex(/^[a-f0-9]{64}$/), z.string().regex(/^\d$/))
           .parse(JSON.parse(await readFile("glyph-fingerprints.json", "utf8")));
@@ -142,6 +172,9 @@ export class LigaPokemonService {
     });
   }
   close() {
-    return this.pool.close();
+    return Promise.all([this.pool.close(), this.searchPages.close()]);
+  }
+  searchPage(cursor: string) {
+    return this.searchPages.next(cursor);
   }
 }
