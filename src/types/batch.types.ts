@@ -39,9 +39,7 @@ export function createBatchSchema(maxCards = 20) {
     .transform((input, ctx) => {
       const cards = input.cards.map((item, index) => {
         const object = typeof item === "string" ? { name: item } : item;
-        const card = object.number
-          ? `${object.name} (${object.number})`
-          : object.name;
+        const card = object.name;
         const query = querySchema.safeParse({
           card,
           number: object.number ?? /\((\d+(?:\/\d+)?)\)$/.exec(card)?.[1],
@@ -58,7 +56,7 @@ export function createBatchSchema(maxCards = 20) {
             });
           return null;
         }
-        return { query: card, input: query.data };
+        return { query: query.data.card, input: query.data };
       });
       if (cards.some((c) => c === null)) return z.NEVER;
       return { cards: cards as Array<NonNullable<(typeof cards)[number]>> };

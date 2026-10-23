@@ -16,6 +16,8 @@ Para produção local: `npm run build` e `npm start`. Verificações: `npm test`
 
 ## Consultar
 
+Você pode informar `card=Pikachu (1/9)` ou `card=Pikachu&number=1/9`: a API normaliza ambas as formas para a mesma consulta no portal e a mesma chave de cache. O número não é duplicado quando está nos dois campos. Números conflitantes entre o nome e `number` retornam HTTP 400 antes da coleta. A normalização também vale para as cartas de consultas em lote.
+
 Os resultados individuais e os sucessos em lote incluem `card.imageUrl` (imagem principal publicada pelo portal) e `card.url` (página efetivamente consultada da carta). São `null` quando indisponíveis; imagens são restritas às origens HTTPS da Liga Pokémon e do repositório de imagens usado pelo portal. A imagem é da edição identificada na consulta.
 
 ```powershell

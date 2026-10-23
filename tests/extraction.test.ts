@@ -81,6 +81,17 @@ it("monta URL com caracteres reservados", () => {
   ).toBe("Mr. Mime (1/10)");
 });
 
+it("normaliza número separado e número no nome para a mesma busca no portal", () => {
+  const inline = querySchema.parse({ card: "Pikachu (1/9)" });
+  const separate = querySchema.parse({ card: "Pikachu", number: "1/9" });
+  expect(separate).toEqual(inline);
+  expect(new URL(buildCardUrl(separate.card)).searchParams.get("card")).toBe("Pikachu (1/9)");
+  expect(querySchema.parse({ card: "Pikachu (1/9)", number: "1/9" }).card).toBe("Pikachu (1/9)");
+  expect(querySchema.parse({ card: "Pikachu", number: "025/165" }).card).toBe("Pikachu (025/165)");
+  expect(querySchema.parse({ card: "Pikachu", number: "25" }).card).toBe("Pikachu (25)");
+  expect(querySchema.safeParse({ card: "Pikachu (1/9)", number: "12/17" }).success).toBe(false);
+});
+
 it("extrai imagem principal e o endereço real da carta, sem usar anúncios", async () => {
   const page = await browser.newPage();
   const url = buildCardUrl("Articuno (132/128)");

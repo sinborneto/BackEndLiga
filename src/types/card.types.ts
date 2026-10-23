@@ -28,7 +28,19 @@ export const querySchema = z
       q.maxPrice === undefined ||
       q.minPrice <= q.maxPrice,
     { message: "minPrice deve ser menor ou igual a maxPrice" },
-  );
+  )
+  .superRefine((query, ctx) => {
+    const embedded = /\((\d+(?:\/\d+)?)\)\s*$/.exec(query.card)?.[1];
+    if (query.number && embedded && query.number !== embedded) {
+      ctx.addIssue({ code: "custom", path: ["number"], message: "O número no nome da carta difere do campo number." });
+    }
+  })
+  .transform(query => {
+    const embedded = /\((\d+(?:\/\d+)?)\)\s*$/.exec(query.card)?.[1];
+    const number = query.number ?? embedded;
+    const name = query.card.replace(/\s*\(\d+(?:\/\d+)?\)\s*$/, "").trim();
+    return { ...query, card: number ? `${name} (${number})` : query.card, ...(number ? { number } : {}) };
+  });
 export type CardQuery = z.infer<typeof querySchema>;
 export type RawOffer = {
   id: number;

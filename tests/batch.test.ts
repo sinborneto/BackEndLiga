@@ -38,6 +38,14 @@ const result = (): Result => ({
   },
 });
 const success = () => ({ getPrices: vi.fn(async () => result()) });
+it("unifica a identidade da carta no lote e no cache sem duplicar o número", () => {
+  const queries = batchSchema.parse({ cards: [
+    "Pikachu (1/9)", { name: "Pikachu", number: "1/9" }, { name: "Pikachu (1/9)", number: "1/9" },
+  ] }).cards;
+  expect(queries.map(item => item.input.card)).toEqual(Array(3).fill("Pikachu (1/9)"));
+  expect(new Set(queries.map(item => cardKey(item.input))).size).toBe(1);
+  expect(batchSchema.safeParse({ cards: [{ name: "Pikachu (1/9)", number: "12/17" }] }).success).toBe(false);
+});
 it("combina condições no lote e permite sobrescrever a seleção por carta", async () => {
   const base = result();
   const offers = ["NM", "SP", "HP"].map(quality => ({ ...base.offers[0], quality }));
