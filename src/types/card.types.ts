@@ -63,6 +63,8 @@ export const resultSchema = z.object({
     name: z.string(),
     number: z.string().nullable(),
     edition: z.string().nullable(),
+    imageUrl: z.url().nullable().optional(),
+    url: z.url().nullable().optional(),
   }),
   source: z.literal("Liga Pokémon"),
   totalOffers: z.number().int(),

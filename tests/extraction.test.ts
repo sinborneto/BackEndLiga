@@ -4,6 +4,7 @@ import { extractStructures } from "../src/extractors/cards.extractor.js";
 import {
   resolveCard,
   buildCardUrl,
+  extractCardMedia,
 } from "../src/services/card-search.service.js";
 import { querySchema } from "../src/types/card.types.js";
 let browser: Browser;
@@ -78,4 +79,30 @@ it("monta URL com caracteres reservados", () => {
   expect(
     new URL(buildCardUrl("Mr. Mime (1/10)")).searchParams.get("card"),
   ).toBe("Mr. Mime (1/10)");
+});
+
+it("extrai imagem principal e o endereço real da carta, sem usar anúncios", async () => {
+  const page = await browser.newPage();
+  const url = buildCardUrl("Articuno (132/128)");
+  try {
+    await page.route("**/*", route => route.request().resourceType() === "document"
+      ? route.fulfill({ contentType: "text/html", body: '<img src="https://example.com/banner.jpg"><img id="featuredImage" src="//repositorio.sbrauble.com/cartas/articuno.jpg">' })
+      : route.abort());
+    await page.goto(url);
+    expect(await extractCardMedia(page)).toEqual({ imageUrl: "https://repositorio.sbrauble.com/cartas/articuno.jpg", url });
+    await page.locator("#featuredImage").evaluate(el => el.setAttribute("src", "https://example.com/other.jpg"));
+    expect(await extractCardMedia(page)).toEqual({ imageUrl: null, url });
+  } finally { await page.close(); }
+});
+
+it("ausência da imagem não impede retornar a página da carta", async () => {
+  const page = await browser.newPage();
+  const url = buildCardUrl("Pikachu (025/165)");
+  try {
+    await page.route("**/*", route => route.fulfill({ contentType: "text/html", body: '<img src="https://example.com/banner.jpg">' }));
+    await page.goto(url);
+    expect(await extractCardMedia(page)).toEqual({ imageUrl: null, url });
+    await page.goto("about:blank");
+    expect(await extractCardMedia(page)).toEqual({ imageUrl: null, url: null });
+  } finally { await page.close(); }
 });

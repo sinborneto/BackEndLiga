@@ -9,6 +9,26 @@ export function buildCardUrl(card: string) {
   }).toString();
   return url.href;
 }
+export async function extractCardMedia(page: Page) {
+  const image = await page.evaluate(() => document.querySelector<HTMLImageElement>("#featuredImage")?.getAttribute("src") ?? null);
+  const allowedUrl = (value: string | null, hosts: string[]) => {
+    if (!value) return null;
+    try {
+      const url = new URL(value, page.url());
+      return url.protocol === "https:" && hosts.includes(url.hostname) && !url.username && !url.password
+        ? url.href
+        : null;
+    } catch {
+      return null;
+    }
+  };
+  const url = allowedUrl(page.url(), ["www.ligapokemon.com.br", "ligapokemon.com.br"]);
+  const parsed = url ? new URL(url) : null;
+  return {
+    imageUrl: allowedUrl(image, ["repositorio.sbrauble.com", "www.ligapokemon.com.br", "ligapokemon.com.br"]),
+    url: parsed && ["cards/card", "cards/search"].includes(parsed.searchParams.get("view") ?? "") && parsed.searchParams.get("card") ? url : null,
+  };
+}
 export async function resolveCard(page: Page, q: CardQuery) {
   const data = await page.evaluate(() => ({
     title: document.title,

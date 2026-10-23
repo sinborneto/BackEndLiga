@@ -12,7 +12,7 @@ import {
   extractStructures,
   extractSprites,
 } from "../extractors/cards.extractor.js";
-import { buildCardUrl, resolveCard } from "./card-search.service.js";
+import { buildCardUrl, resolveCard, extractCardMedia } from "./card-search.service.js";
 import { mapOffers } from "./marketplace.service.js";
 import { cardKey } from "./batch-prices.service.js";
 const profilesSchema = z.array(
@@ -72,6 +72,7 @@ export class LigaPokemonService {
             Array.isArray(window.cards_stock) && window.cards_stores != null,
         );
         const raw = await extractStructures(page);
+        const media = await extractCardMedia(page);
         const editions = [
           ...new Set(raw.offers.map((o) => o.idEdicao).filter(Boolean)),
         ];
@@ -109,7 +110,7 @@ export class LigaPokemonService {
           .parse(JSON.parse(await readFile("glyph-fingerprints.json", "utf8")));
         const offers = mapOffers(raw.offers, raw.stores, ctx);
         return resultSchema.parse({
-          card,
+          card: { ...card, ...media },
           source: "Liga Pokémon",
           totalOffers: offers.length,
           collectedAt: new Date().toISOString(),

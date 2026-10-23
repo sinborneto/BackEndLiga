@@ -16,6 +16,8 @@ Para produção local: `npm run build` e `npm start`. Verificações: `npm test`
 
 ## Consultar
 
+Os resultados individuais e os sucessos em lote incluem `card.imageUrl` (imagem principal publicada pelo portal) e `card.url` (página efetivamente consultada da carta). São `null` quando indisponíveis; imagens são restritas às origens HTTPS da Liga Pokémon e do repositório de imagens usado pelo portal. A imagem é da edição identificada na consulta.
+
 ```powershell
 curl.exe "http://localhost:3000/api/cards/prices?card=Articuno%20%28132%2F128%29&edition=30C&number=132"
 curl.exe "http://localhost:3000/api/cards/prices?card=Articuno%20%28132%2F128%29&quality=NM&finish=Foil&minStock=2&maxPrice=60&sort=price_asc"
