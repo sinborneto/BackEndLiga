@@ -58,9 +58,10 @@ export function mapOffers(
   });
 }
 export function filterResult(result: Result, q: CardQuery): Result {
+  const qualities = q.quality?.toUpperCase().split(",").map(value => value.trim());
   const offers = result.offers.filter(
     (o) =>
-      (!q.quality || o.quality?.toLowerCase() === q.quality.toLowerCase()) &&
+      (!qualities || (o.quality !== null && qualities.includes(o.quality.toUpperCase()))) &&
       (!q.finish || o.finish?.toLowerCase() === q.finish.toLowerCase()) &&
       (!q.language || o.language?.toLowerCase() === q.language.toLowerCase()) &&
       (!q.state || o.state?.toLowerCase() === q.state.toLowerCase()) &&

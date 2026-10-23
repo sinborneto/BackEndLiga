@@ -38,6 +38,18 @@ const result = (): Result => ({
   },
 });
 const success = () => ({ getPrices: vi.fn(async () => result()) });
+it("combina condições no lote e permite sobrescrever a seleção por carta", async () => {
+  const base = result();
+  const offers = ["NM", "SP", "HP"].map(quality => ({ ...base.offers[0], quality }));
+  const service = { getPrices: async () => ({ ...base, offers, totalOffers: offers.length }) };
+  const response = await new BatchPricesService(service).getPrices(batchSchema.parse({
+    cards: ["Pikachu", { name: "Pikachu", filters: { quality: " hp, D " } }],
+    filters: { quality: " nm,SP,nm " },
+  }));
+  expect(response.results[0]).toMatchObject({ status: "success", totalOffers: 2, offers: [{ quality: "NM" }, { quality: "SP" }] });
+  expect(response.results[1]).toMatchObject({ status: "success", totalOffers: 1, offers: [{ quality: "HP" }] });
+  expect(batchSchema.safeParse({ cards: ["Pikachu"], filters: { quality: "NM,INVALID" } }).success).toBe(false);
+});
 it("consulta duas cartas válidas preservando todas as ofertas e ordem", async () => {
   const service = success();
   const response = await new BatchPricesService(service).getPrices(

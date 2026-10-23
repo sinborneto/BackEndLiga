@@ -1,4 +1,7 @@
 import { z } from "zod";
+export const qualityFilterSchema = z.string().trim()
+  .regex(/^(?:M|NM|SP|MP|HP|D)(?:\s*,\s*(?:M|NM|SP|MP|HP|D))*$/i, "Condições válidas: M, NM, SP, MP, HP e D, separadas por vírgula.")
+  .transform(value => [...new Set(value.toUpperCase().split(",").map(item => item.trim()))].join(","));
 export const querySchema = z
   .object({
     card: z.string().trim().min(1).max(200),
@@ -8,7 +11,7 @@ export const querySchema = z
       .trim()
       .regex(/^\d+(?:\/\d+)?$/)
       .optional(),
-    quality: z.string().optional(),
+    quality: qualityFilterSchema.optional(),
     finish: z.string().optional(),
     language: z.string().optional(),
     state: z.string().optional(),

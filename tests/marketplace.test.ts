@@ -114,6 +114,11 @@ describe("marketplace e sprites", () => {
       expect(filtered.offers[0]).toMatchObject({ offerId: index + 1, quality });
     }
     expect(result.offers).toHaveLength(5);
+    const combined = filterResult(result, querySchema.parse({ card: "Pikachu", quality: " sp, HP,sp " }));
+    expect(combined.offers.map(o => o.quality)).toEqual(["SP", "HP"]);
+    expect(combined.totalOffers).toBe(2);
+    expect(querySchema.parse({ card: "Pikachu", quality: " sp, HP,sp " }).quality).toBe("SP,HP");
+    expect(querySchema.safeParse({ card: "Pikachu", quality: "NM,INVALID" }).success).toBe(false);
     expect(mapQuality(null)).toBeNull();
     expect(mapQuality(undefined)).toBeNull();
   });

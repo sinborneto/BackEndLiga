@@ -1,10 +1,10 @@
 import { z } from "zod";
-import { querySchema, resultSchema } from "./card.types.js";
+import { querySchema, resultSchema, qualityFilterSchema } from "./card.types.js";
 export const cleanText = (s: string) => s.trim().replace(/\s+/g, " ");
 const name = z.string().transform(cleanText).pipe(z.string().min(1).max(200));
 export const batchFiltersSchema = z
   .object({
-    quality: name.optional(),
+    quality: qualityFilterSchema.optional(),
     finish: name.optional(),
     language: name.optional(),
     state: name.optional(),
