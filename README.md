@@ -16,6 +16,17 @@ Para produção local: `npm run build` e `npm start`. Verificações: `npm test`
 
 ## Consultar
 
+### Catálogo de edições e cartas
+
+- `GET /api/editions`: lista completa publicada pela Liga, incluindo subconjuntos. Retorna `editions` com ID, sigla, nomes português/inglês, ano, data, edição principal (`parentId`), ícone e URL oficial. Cache de 1 hora.
+- `GET /api/editions/:id/cards`: retorna `edition`, `cards` e `collectedAt`. Cada carta informa nome português/inglês, número completo, raridade, energias, imagem, menor/maior preço anunciado e URL oficial. Cache de 10 minutos. IDs inválidos retornam 400; edições inexistentes, 404.
+
+O catálogo lê os dados JSON publicados nas páginas de edições e de busca por edição, sem executar textos extraídos como código. Carrega a edição completa, sem depender da primeira página ou das imagens visíveis. Rótulos dos filtros vêm da própria Liga; valores desconhecidos permanecem nulos. Preços do catálogo são referências do portal, sem coleta individual de estoque. Navegador separado com até duas páginas simultâneas, fila limitada e os mesmos limites de tempo das consultas.
+
+Referências: [edições](https://www.ligapokemon.com.br/?view=cards/edicoes) e [cartas da 30C](https://www.ligapokemon.com.br/?view=cards/search&card=edid=804%20ed=30C). Conferência em 23/10/2026: 811 edições e 158 cartas da 30C; também verificadas BS, M6a, 30C-C e MEG. Totais sujeitos a mudanças no portal.
+
+### Ofertas e leilões
+
 Leilões (`sellType=2` na Liga) ficam exclusivamente em `auctions`, com contagem em `totalAuctions`; `offers` e `totalOffers` incluem somente ofertas de lojas. Cada leilão informa título, `bidPrice` (valor de lance anunciado, inicial quando `bids=0`), `fixedPrice`, `bidIncrement`, `bids`, `endsAt` em ISO UTC, vendedor/perfil, UF, referências, percentual positivo quando houver referências, condição, acabamento, idioma, aceitação de LigaSegura e link oficial do anúncio. Preço de lance ou incremento igual a zero é tratado como modalidade indisponível, não como oferta gratuita. Datas do portal usam Brasília (UTC−03:00), validado pelo encerramento exibido; anúncios já encerrados são omitidos na coleta. Valores ausentes continuam `null`.
 
 Os filtros de condição, acabamento, idioma e UF se aplicam às duas listas. Preços mínimo/máximo e estoque mínimo se aplicam somente às lojas, pois lances não são preços unitários e leilões não possuem estoque de loja. Estatísticas de preços/estoque/lojas e diagnósticos de decodificação consideram somente as ofertas de lojas. No lote, cada resultado traz as duas listas e o resumo separa `totalOffers` de `totalAuctions`.
@@ -43,12 +54,36 @@ Resposta ilustrativa reduzida (não representa cotação atual):
 
 ```json
 {
-  "card": {"name":"Articuno","number":"132/128","edition":"30C"},
-  "source":"Liga Pokémon",
-  "totalOffers":1,
-  "collectedAt":"2026-10-22T19:00:00.000Z",
-  "offers":[{"offerId":33426078,"storeId":242400,"store":"Gladiators TCG","city":"Curitiba","state":"PR","price":39.9,"originalPrice":null,"stock":1,"quality":"NM","qualityCode":"2","finish":"Foil","finishCode":2,"language":null,"languageCode":"8","url":"https://www.ligapokemon.com.br/?view=mp%2Fshowcase%2Fhome&id=242400&tcg=33426078"}],
-  "diagnostics":{"pricesDecoded":1,"pricesPending":0,"stocksDecoded":1,"stocksPending":0,"messages":[]}
+  "card": { "name": "Articuno", "number": "132/128", "edition": "30C" },
+  "source": "Liga Pokémon",
+  "totalOffers": 1,
+  "collectedAt": "2026-10-22T19:00:00.000Z",
+  "offers": [
+    {
+      "offerId": 33426078,
+      "storeId": 242400,
+      "store": "Gladiators TCG",
+      "city": "Curitiba",
+      "state": "PR",
+      "price": 39.9,
+      "originalPrice": null,
+      "stock": 1,
+      "quality": "NM",
+      "qualityCode": "2",
+      "finish": "Foil",
+      "finishCode": 2,
+      "language": null,
+      "languageCode": "8",
+      "url": "https://www.ligapokemon.com.br/?view=mp%2Fshowcase%2Fhome&id=242400&tcg=33426078"
+    }
+  ],
+  "diagnostics": {
+    "pricesDecoded": 1,
+    "pricesPending": 0,
+    "stocksDecoded": 1,
+    "stocksPending": 0,
+    "messages": []
+  }
 }
 ```
 
@@ -62,9 +97,20 @@ Resposta ilustrativa reduzida (não representa cotação atual):
 {
   "cards": [
     "Articuno (132/128)",
-    {"name":"Chandelure","number":"137/128","edition":"30C","filters":{"minStock":2,"maxPrice":60}}
+    {
+      "name": "Chandelure",
+      "number": "137/128",
+      "edition": "30C",
+      "filters": { "minStock": 2, "maxPrice": 60 }
+    }
   ],
-  "filters":{"quality":"NM","finish":"Foil","language":"Português","maxPrice":100,"sort":"price_asc"}
+  "filters": {
+    "quality": "NM",
+    "finish": "Foil",
+    "language": "Português",
+    "maxPrice": 100,
+    "sort": "price_asc"
+  }
 }
 ```
 
@@ -79,10 +125,29 @@ Resposta ilustrativa abreviada (a API inclui `offers`, `diagnostics`, `statistic
 
 ```json
 {
-  "summary":{"requestedCards":2,"successfulCards":1,"failedCards":1,"totalOffers":81,"durationMs":8500},
-  "results":[
-    {"query":"Articuno (132/128)","status":"success","card":{"name":"Articuno","number":"132/128","edition":"30C"},"totalOffers":81},
-    {"query":"Inexistente (999/999)","status":"error","error":{"code":"CARD_NOT_FOUND","message":"Carta não encontrada.","details":null}}
+  "summary": {
+    "requestedCards": 2,
+    "successfulCards": 1,
+    "failedCards": 1,
+    "totalOffers": 81,
+    "durationMs": 8500
+  },
+  "results": [
+    {
+      "query": "Articuno (132/128)",
+      "status": "success",
+      "card": { "name": "Articuno", "number": "132/128", "edition": "30C" },
+      "totalOffers": 81
+    },
+    {
+      "query": "Inexistente (999/999)",
+      "status": "error",
+      "error": {
+        "code": "CARD_NOT_FOUND",
+        "message": "Carta não encontrada.",
+        "details": null
+      }
+    }
   ]
 }
 ```

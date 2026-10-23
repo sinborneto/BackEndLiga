@@ -9,10 +9,11 @@ import {
 import { filterResult } from "./services/marketplace.service.js";
 import { BatchPricesService } from "./services/batch-prices.service.js";
 import { createBatchSchema } from "./types/batch.types.js";
+import type { CatalogProvider } from "./services/catalog.service.js";
 export interface PriceService {
   getPrices(q: CardQuery): Promise<Result>;
 }
-export function createApp(service: PriceService) {
+export function createApp(service: PriceService, catalog?: CatalogProvider) {
   const positive = (value: string | undefined, fallback: number) => {
     const n = Number(value ?? fallback);
     if (!Number.isInteger(n) || n < 1)
@@ -45,6 +46,38 @@ export function createApp(service: PriceService) {
     }
   });
   app.get("/health", (_req, res) => res.json({ status: "ok" }));
+  app.get("/api/editions", async (_req, res, next) => {
+    try {
+      if (!catalog)
+        throw new ApiError(
+          503,
+          "CATALOG_UNAVAILABLE",
+          "Catálogo indisponível.",
+        );
+      res.json({ editions: await catalog.getEditions() });
+    } catch (error) {
+      next(error);
+    }
+  });
+  app.get("/api/editions/:id/cards", async (req, res, next) => {
+    try {
+      if (!/^\d{1,6}$/.test(req.params.id))
+        throw new ApiError(
+          400,
+          "INVALID_EDITION",
+          "Identificador de edição inválido.",
+        );
+      if (!catalog)
+        throw new ApiError(
+          503,
+          "CATALOG_UNAVAILABLE",
+          "Catálogo indisponível.",
+        );
+      res.json(await catalog.getCards(req.params.id));
+    } catch (error) {
+      next(error);
+    }
+  });
   app.get("/api/cards/prices", async (req, res, next) => {
     const parsed = querySchema.safeParse(req.query);
     if (!parsed.success) {

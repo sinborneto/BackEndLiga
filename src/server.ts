@@ -1,10 +1,14 @@
 import { createApp } from "./app.js";
 import { LigaPokemonService } from "./services/liga-pokemon.service.js";
+import { CatalogService } from "./services/catalog.service.js";
 const service = new LigaPokemonService();
-const server = createApp(service).listen(Number(process.env.PORT ?? 3000), () =>
-  console.log(
-    "API disponível em http://localhost:" + String(process.env.PORT ?? 3000),
-  ),
+const catalog = new CatalogService();
+const server = createApp(service, catalog).listen(
+  Number(process.env.PORT ?? 3000),
+  () =>
+    console.log(
+      "API disponível em http://localhost:" + String(process.env.PORT ?? 3000),
+    ),
 );
 let stopping = false;
 async function stop() {
@@ -13,7 +17,7 @@ async function stop() {
   const timer = setTimeout(() => process.exit(1), 15000);
   timer.unref();
   server.close(async () => {
-    await service.close();
+    await Promise.all([service.close(), catalog.close()]);
     clearTimeout(timer);
   });
 }
