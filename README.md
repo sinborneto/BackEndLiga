@@ -112,6 +112,8 @@ Estoque aceita múltiplos glifos separados por `;`, assim como preços; `V` é s
 
 ## Recursos e falhas
 
+Os filtros `finish`, `language` e `state` também aceitam múltiplos valores separados por vírgula (ex.: `finish=Foil,Normal&language=Português,Inglês&state=SP,PR`). Dentro de cada filtro vale qualquer opção selecionada; entre filtros diferentes, a oferta precisa atender a todos. A ausência de um filtro inclui todos os valores, inclusive desconhecidos. Essa regra também vale no lote.
+
 O filtro `quality` aceita múltiplas condições separadas por vírgula, por exemplo `quality=NM,SP,HP`: retorna ofertas que correspondam a qualquer uma delas. Ausência do parâmetro inclui todas. No lote, use a mesma string nos filtros globais ou individuais. São aceitas somente `M`, `NM`, `SP`, `MP`, `HP` e `D`; espaços e caixa são normalizados e duplicatas são removidas.
 
 Condições (`quality`): `1 → M`, `2 → NM`, `3 → SP`, `4 → MP`, `5 → HP`, `6 → D`; `0 → Não definida`. Mapeamento confirmado em 23/10/2026 nos seletores `#collection_quality` e `#bazar_quality` do portal, usando Pikachu (12/17) como referência para HP. O código bruto continua em `qualityCode` e códigos desconhecidos retornam `null`. O filtro `quality` aceita as siglas, sem diferenciar maiúsculas e minúsculas, tanto na consulta individual quanto no lote.

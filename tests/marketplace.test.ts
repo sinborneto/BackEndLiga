@@ -23,6 +23,19 @@ const context = (): SpriteContext => ({
   fingerprints,
 });
 describe("marketplace e sprites", () => {
+  it("aceita várias opções por atributo e combina os quatro filtros", () => {
+    const offers = mapOffers([
+      {id:1,lj_id:1,qualid:2,extras:2,idioma:8,preco:10},
+      {id:2,lj_id:2,qualid:5,extras:0,idioma:2,preco:20},
+      {id:3,lj_id:3,qualid:2,extras:2,idioma:8,preco:30},
+      {id:4,lj_id:4,preco:40},
+    ], {"1":{lj_uf:"PR"},"2":{lj_uf:"SP"},"3":{lj_uf:"RJ"}}, context());
+    const result = resultSchema.parse({card:{name:"teste",number:null,edition:null},source:"Liga Pokémon",collectedAt:"2026-10-23T12:00:00.000Z",totalOffers:4,offers,diagnostics:{pricesDecoded:4,pricesPending:0,stocksDecoded:0,stocksPending:4,messages:[]}});
+    const query = querySchema.parse({card:"teste",quality:"NM,HP",finish:"foil, normal",language:"português, INGLÊS",state:"pr, SP"});
+    expect(filterResult(result,query).offers.map(offer=>offer.offerId)).toEqual([1,2]);
+    expect(filterResult(result,{...query,quality:"NM",state:"SP"}).offers).toEqual([]);
+    expect(filterResult(result,querySchema.parse({card:"teste"})).totalOffers).toBe(4);
+  });
   it("mantém vitrine da Liga e redirecionamento oficial para o produto na loja separados", () => {
     const offers = mapOffers([
       {id:33426078,lj_id:242400}, {id:2,lj_id:3,sellType:2}, {id:-1,lj_id:3},

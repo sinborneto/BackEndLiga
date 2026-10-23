@@ -68,13 +68,14 @@ export function mapOffers(
   });
 }
 export function filterResult(result: Result, q: CardQuery): Result {
-  const qualities = q.quality?.toUpperCase().split(",").map(value => value.trim());
+  const matches = (value: string | null, selection?: string) => !selection ||
+    (value !== null && selection.split(",").some(item => item.trim().toLowerCase() === value.toLowerCase()));
   const offers = result.offers.filter(
     (o) =>
-      (!qualities || (o.quality !== null && qualities.includes(o.quality.toUpperCase()))) &&
-      (!q.finish || o.finish?.toLowerCase() === q.finish.toLowerCase()) &&
-      (!q.language || o.language?.toLowerCase() === q.language.toLowerCase()) &&
-      (!q.state || o.state?.toLowerCase() === q.state.toLowerCase()) &&
+      matches(o.quality, q.quality) &&
+      matches(o.finish, q.finish) &&
+      matches(o.language, q.language) &&
+      matches(o.state, q.state) &&
       (q.minStock === undefined ||
         (o.stock !== null && o.stock >= q.minStock)) &&
       (q.minPrice === undefined ||
