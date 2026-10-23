@@ -23,6 +23,14 @@ const context = (): SpriteContext => ({
   fingerprints,
 });
 describe("marketplace e sprites", () => {
+  it("mantém vitrine da Liga e redirecionamento oficial para o produto na loja separados", () => {
+    const offers = mapOffers([
+      {id:33426078,lj_id:242400}, {id:2,lj_id:3,sellType:2}, {id:-1,lj_id:3},
+    ], {}, context());
+    expect(offers[0].url).toContain("view=mp%2Fshowcase%2Fhome");
+    expect(offers[0].storeUrl).toBe("https://www.ligapokemon.com.br/b/?p=e33426078");
+    expect(offers[1].storeUrl).toBeNull(); expect(offers[2].storeUrl).toBeNull();
+  });
   it("usa o logotipo do comparador e mantém ausência sem inventar imagens", () => {
     const offers = mapOffers([
       {id:1,lj_id:1}, {id:2,lj_id:2}, {id:3,lj_id:3}, {id:4,lj_id:4},

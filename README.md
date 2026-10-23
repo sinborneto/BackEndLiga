@@ -16,6 +16,8 @@ Para produção local: `npm run build` e `npm start`. Verificações: `npm test`
 
 ## Consultar
 
+As ofertas mantêm `url` para a vitrine na Liga e incluem `storeUrl` para o produto na loja, via redirecionamento oficial `https://www.ligapokemon.com.br/b/?p=e<ID da oferta>` usado pelo botão “Ir à Loja” do portal. Esse segundo link é `null` em leilões ou quando faltam identificadores válidos. O destino externo é resolvido pela Liga no navegador, sem uma requisição adicional por oferta durante a coleta.
+
 Cada oferta inclui `storeLogoUrl`, com o logotipo do comparador identificado por `cards_stores[storeId].lj_path` e hospedado no repositório de imagens usado pelo portal. Arquivos ausentes ou inválidos retornam `null`; não se usa o avatar como se fosse o logotipo. O campo está disponível nos resultados individuais e em lote.
 
 A API testa as representações com 1, 2 e 3 dígitos para a numeração, preenchendo cada parte com zeros à esquerda: `1/9`, `01/09` e `001/009`. Formas idênticas não geram chamadas duplicadas (por exemplo, `132/128` já tem três dígitos). A comparação de identidade e de números das ofertas ignora zeros à esquerda. Todas as variantes distintas são consultadas mesmo se uma já encontrar a carta; o limite de páginas do navegador continua valendo. Uma resposta verificada é retornada sem somar ofertas das variantes. Se variantes identificarem edições diferentes, a API retorna 409 e pede a edição. As formas equivalentes compartilham o cache de 10 minutos, inclusive no lote: um acerto no cache não repete as consultas.

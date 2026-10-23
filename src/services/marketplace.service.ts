@@ -60,6 +60,10 @@ export function mapOffers(
       language: mapLanguage(o.idioma),
       languageCode: code(o.idioma),
       url: o.id != null && o.lj_id != null ? url.href : null,
+      // Same official redirect exposed by the portal's #goto-url-store link.
+      storeUrl: o.sellType !== 2 && Number.isSafeInteger(o.id) && o.id > 0 && o.lj_id != null
+        ? `https://www.ligapokemon.com.br/b/?p=e${o.id}`
+        : null,
     };
   });
 }

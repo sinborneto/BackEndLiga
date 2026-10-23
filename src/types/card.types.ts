@@ -73,6 +73,7 @@ export const offerSchema = z.object({
   language: z.string().nullable(),
   languageCode: z.union([z.number(), z.string()]).nullable(),
   url: z.url().nullable(),
+  storeUrl: z.url().nullable().optional(),
 });
 export type Offer = z.infer<typeof offerSchema>;
 export const resultSchema = z.object({
