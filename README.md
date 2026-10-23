@@ -48,7 +48,7 @@ curl.exe "http://localhost:3000/api/cards/prices?card=Articuno%20%28132%2F128%29
 
 Parâmetros: `card` obrigatório; `edition`, `number`, `quality`, `finish`, `language`, `state`, `minStock`, `minPrice`, `maxPrice` opcionais. `sort`: `price_asc` (padrão), `price_desc`, `stock_desc`. Desconhecidos ficam ao final em ambas as direções. Filtros numéricos excluem ofertas cujo valor é desconhecido. Estados usam siglas, atributos usam os rótulos da resposta.
 
-O serviço usa links efetivamente encontrados no portal para navegar entre candidatos. Não inventa parâmetros de edição. Retorna 409 com candidatos quando não consegue selecionar ou confirmar a edição. Listas que incluem mais de um `idEdicao` ou número são rejeitadas, sem misturar ofertas. Algumas buscas podem exigir nome e numeração completos.
+Quando a edição é informada, a navegação inicial envia a sigla em `ed` e o numerador em `num`, parâmetros oficiais usados pelos links do catálogo da Liga. Por exemplo, `VS Seeker (021/032)`, edição `CLF`, abre com `ed=CLF&num=021`, evitando uma busca genérica ambígua. A edição e o número continuam sendo confirmados na página e nas ofertas; os parâmetros enviados não são usados como prova de identidade. Para navegar entre candidatos, o serviço usa links efetivamente encontrados no portal. Retorna 409 quando não consegue selecionar ou confirmar a edição. Listas que incluem mais de um `idEdicao` ou número são rejeitadas, sem misturar ofertas.
 
 Resposta ilustrativa reduzida (não representa cotação atual):
 

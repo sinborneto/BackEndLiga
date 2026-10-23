@@ -81,6 +81,28 @@ it("monta URL com caracteres reservados", () => {
   ).toBe("Mr. Mime (1/10)");
 });
 
+it("envia edição e número aos parâmetros oficiais da Liga para cartas do catálogo", async () => {
+  const page = await browser.newPage();
+  const query = querySchema.parse({card:"VS Seeker",edition:"CLF",number:"021/032"});
+  const url = buildCardUrl(query.card, query.edition, query.number);
+  const params = new URL(url).searchParams;
+  expect(params.get("card")).toBe("VS Seeker (021/032)");
+  expect(params.get("ed")).toBe("CLF");
+  expect(params.get("num")).toBe("021");
+  try {
+    await page.route("**/*", route => {
+      const requested = new URL(route.request().url()).searchParams;
+      return route.fulfill({contentType:"text/html",body:requested.get("ed")==="CLF" && requested.get("num")==="021"
+        ? '<title>Explorador VS / VS Seeker (021/032)</title><h1>Explorador VS (021/032)</h1><p>VS Seeker</p><span class="sigla-edition">CLF</span><script>window.cards_stock=[];</script>'
+        : '<a href="https://www.ligapokemon.com.br/?view=cards/card&card=Judge%20(21/32)&ed=10A&num=21">Judge</a>'});
+    });
+    await page.goto(url);
+    await expect(resolveCard(page,query)).resolves.toMatchObject({name:"VS Seeker",number:"021/032",edition:"CLF"});
+    await expect(resolveCard(page,{...query,edition:"OTHER"})).rejects.toMatchObject({code:"EDITION_UNVERIFIED"});
+  } finally {await page.close();}
+  expect(new URL(buildCardUrl("VS Seeker (21/32)")).searchParams.has("ed")).toBe(false);
+});
+
 it("normaliza número separado e número no nome para a mesma busca no portal", () => {
   const inline = querySchema.parse({ card: "Pikachu (1/9)" });
   const separate = querySchema.parse({ card: "Pikachu", number: "1/9" });

@@ -1,12 +1,14 @@
 import type { Page } from "playwright";
 import { ApiError, type CardQuery } from "../types/card.types.js";
 import { normalizeCardNumber } from "../utils/card-number.js";
-export function buildCardUrl(card: string) {
+export function buildCardUrl(card: string, edition?: string, number?: string) {
   const url = new URL("https://www.ligapokemon.com.br/");
   url.search = new URLSearchParams({
     view: "cards/card",
     tipo: "1",
     card,
+    ...(edition ? { ed: edition } : {}),
+    ...(edition && number ? { num: number.split("/")[0] } : {}),
   }).toString();
   return url.href;
 }

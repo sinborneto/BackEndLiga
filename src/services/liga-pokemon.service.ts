@@ -44,7 +44,7 @@ export class LigaPokemonService {
   private async collect(q: CardQuery): Promise<Result> {
     return this.pool.run(async (page) => {
       try {
-        const response = await page.goto(buildCardUrl(q.card), {
+        const response = await page.goto(buildCardUrl(q.card, q.edition, q.number), {
           waitUntil: "domcontentloaded",
         });
         if (response?.status() === 403) {
