@@ -1,7 +1,9 @@
-import { chromium, type Browser, type Page } from "playwright";
+import { chromium, type Browser, type BrowserContext, type Page } from "playwright";
 import { ApiError } from "../types/card.types.js";
+
 export class BrowserPool {
   private browser?: Promise<Browser>;
+  private context?: Promise<BrowserContext>;
   private active = 0;
   private waiters: Array<() => void> = [];
   private queuedLimit = 20;
@@ -21,15 +23,10 @@ export class BrowserPool {
         throw new Error("Fila de consultas cheia");
       await new Promise<void>((resolve) => this.waiters.push(resolve));
     } else this.active++;
-    let context;
+    let page: Page | undefined;
     let timer: ReturnType<typeof setTimeout> | undefined;
     try {
-      this.browser ??= chromium.launch({ headless: true }).catch((e) => {
-        this.browser = undefined;
-        throw e;
-      });
-      context = await (await this.browser).newContext({ locale: "pt-BR" });
-      const page = await context.newPage();
+      page = await (await this.session()).newPage();
       page.setDefaultTimeout(this.timeout);
       page.setDefaultNavigationTimeout(this.timeout);
       return await Promise.race([
@@ -51,13 +48,34 @@ export class BrowserPool {
     } finally {
       clearTimeout(timer);
       try {
-        await context?.close();
+        await page?.close();
       } finally {
         const next = this.waiters.shift();
         if (next) next();
         else this.active--;
       }
     }
+  }
+  private session(): Promise<BrowserContext> {
+    this.context ??= (async () => {
+      this.browser ??= chromium.launch({ headless: true }).then((browser) => {
+        browser.once("disconnected", () => {
+          this.browser = undefined;
+          this.context = undefined;
+        });
+        return browser;
+      }).catch((error) => {
+        this.browser = undefined;
+        throw error;
+      });
+      const context = await (await this.browser).newContext({ locale: "pt-BR" });
+      context.once("close", () => { this.context = undefined; });
+      return context;
+    })().catch((error) => {
+      this.context = undefined;
+      throw error;
+    });
+    return this.context;
   }
   async close() {
     await (await this.browser)?.close();

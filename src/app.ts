@@ -11,6 +11,11 @@ import { BatchPricesService } from "./services/batch-prices.service.js";
 import { createBatchSchema } from "./types/batch.types.js";
 import type { CatalogProvider } from "./services/catalog.service.js";
 import { ThumbnailService } from "./services/thumbnail.service.js";
+import {
+  buildPriceCsv,
+  exportedEdition,
+  priceCsvSchema,
+} from "./services/price-csv.service.js";
 export interface PriceService {
   getPrices(q: CardQuery): Promise<Result>;
   searchPage?(cursor: string): Promise<unknown>;
@@ -56,6 +61,55 @@ export function createApp(
     },
   );
   app.use(rateLimit({ windowMs: 60000, limit: 30 }));
+  // Registered before the global parser: 1000 rows exceed its 128 kB limit.
+  app.post(
+    "/api/editions/:id/price-csv",
+    express.json({ limit: "512kb" }),
+    async (req, res, next) => {
+      try {
+        if (!/^\d{1,6}$/.test(req.params.id))
+          throw new ApiError(
+            400,
+            "INVALID_EDITION",
+            "Identificador de edição inválido.",
+          );
+        const parsed = priceCsvSchema.safeParse(req.body);
+        if (!parsed.success) {
+          res
+            .status(400)
+            .json({ error: "INVALID_CSV_ROWS", details: parsed.error.flatten() });
+          return;
+        }
+        const fallback = exportedEdition(req.params.id, parsed.data);
+        let data;
+        try {
+          if (!catalog)
+            throw new ApiError(
+              503,
+              "CATALOG_UNAVAILABLE",
+              "Catálogo indisponível.",
+            );
+          data = await catalog.getCards(req.params.id);
+        } catch (error) {
+          // Without the portal, the export's own columns are still a valid source.
+          const portalDown =
+            !(error instanceof ApiError) || error.status >= 500;
+          if (!fallback || !portalDown) throw error;
+          data = fallback;
+        }
+        const csv = buildPriceCsv(data, parsed.data);
+        res
+          .set({
+            "Content-Type": "text/csv; charset=utf-8",
+            "Content-Disposition": `attachment; filename="precos-${data.edition.code.replace(/[^\w.-]/g, "_")}.csv"`,
+            "X-Content-Type-Options": "nosniff",
+          })
+          .send(csv);
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
   app.use(express.json({ limit: "128kb" }));
   app.post("/api/cards/prices/batch", async (req, res, next) => {
     const parsed = batchSchema.safeParse(req.body);
@@ -73,6 +127,7 @@ export function createApp(
   });
   app.get("/health", (_req, res) => res.json({ status: "ok" }));
   app.get("/api/editions", async (_req, res, next) => {
+    if (catalog?.transport) res.setHeader("X-Catalog-Transport", catalog.transport);
     try {
       if (!catalog)
         throw new ApiError(
@@ -86,6 +141,7 @@ export function createApp(
     }
   });
   app.get("/api/editions/:id/cards", async (req, res, next) => {
+    if (catalog?.transport) res.setHeader("X-Catalog-Transport", catalog.transport);
     try {
       if (!/^\d{1,6}$/.test(req.params.id))
         throw new ApiError(

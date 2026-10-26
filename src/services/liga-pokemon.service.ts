@@ -22,7 +22,8 @@ import { cardKey } from "./batch-prices.service.js";
 import { collectNumberVariants } from "./number-variants.service.js";
 import { normalizeCardNumber } from "../utils/card-number.js";
 import { isAuction, mapAuctions } from "../mappers/auctions.js";
-import { PortalLimit } from "./portal-limit.js";
+import { PortalLimit, sharedPortalLimit } from "./portal-limit.js";
+import { join } from "node:path";
 import { SearchPagesService } from "./search-pages.service.js";
 const profilesSchema = z.array(
   z.object({
@@ -34,8 +35,7 @@ const profilesSchema = z.array(
   }),
 );
 export class LigaPokemonService {
-  private readonly portalLimit = new PortalLimit();
-  private readonly searchPages = new SearchPagesService(this.portalLimit);
+  private readonly searchPages: SearchPagesService;
   constructor(
     private pool = new BrowserPool(
       Number(process.env.MAX_PAGES ?? 3),
@@ -43,8 +43,26 @@ export class LigaPokemonService {
     ),
     private cache = new QueryCache<Result>(
       Number(process.env.CACHE_TTL_MS ?? 600000),
+      Number(process.env.CACHE_MAX ?? 500),
+      {
+        file: join(process.env.CACHE_DIR ?? ".cache", "offers.json"),
+        // Last saved offers, flagged so the client knows they are not current.
+        stale: (value, savedAt) => ({
+          ...value,
+          diagnostics: {
+            ...value.diagnostics,
+            messages: [
+              ...value.diagnostics.messages,
+              `Dados salvos em ${savedAt.toISOString()}: a Liga não respondeu à consulta atual.`,
+            ],
+          },
+        }),
+      },
     ),
-  ) {}
+    private readonly portalLimit: PortalLimit = sharedPortalLimit,
+  ) {
+    this.searchPages = new SearchPagesService(this.portalLimit);
+  }
   async getPrices(q: CardQuery) {
     if (!q.number && !q.edition) {
       const choices = await this.searchPages.first(q);
@@ -60,6 +78,7 @@ export class LigaPokemonService {
     return this.pool.run(async (page) => {
       try {
         this.portalLimit.assertAvailable();
+        await this.portalLimit.beforeRequest();
         const response = await page.goto(
           buildCardUrl(q.card, q.edition, q.number),
           {
@@ -67,6 +86,7 @@ export class LigaPokemonService {
           },
         );
         this.portalLimit.check(response);
+        await this.portalLimit.checkBlocked(page);
         if (response?.status() === 403) {
           await page
             .waitForFunction(
@@ -172,6 +192,7 @@ export class LigaPokemonService {
     });
   }
   close() {
+    this.cache.flush();
     return Promise.all([this.pool.close(), this.searchPages.close()]);
   }
   searchPage(cursor: string) {

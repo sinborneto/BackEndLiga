@@ -115,3 +115,20 @@ it("expõe edições e cartas e rejeita identificadores inválidos antes da cole
   expect(cards).toHaveBeenCalledTimes(2);
   expect(prices).not.toHaveBeenCalled();
 });
+
+it("identifica o transporte HTTP nas respostas do catálogo, inclusive em bloqueios", async () => {
+  const server = createApp({ getPrices: vi.fn() }, {
+    transport: "http",
+    getEditions: async () => { throw new ApiError(503, "PORTAL_BLOCKED", "aguarde"); },
+    getCards: async () => { throw new ApiError(503, "PORTAL_BLOCKED", "aguarde"); },
+  }).listen(0, "127.0.0.1");
+  servers.push(server);
+  await new Promise<void>((resolve) => server.once("listening", resolve));
+  const addr = server.address();
+  if (!addr || typeof addr === "string") throw Error();
+  for (const path of ["/api/editions", "/api/editions/804/cards"]) {
+    const response = await fetch(`http://127.0.0.1:${addr.port}${path}`);
+    expect(response.status).toBe(503);
+    expect(response.headers.get("x-catalog-transport")).toBe("http");
+  }
+});

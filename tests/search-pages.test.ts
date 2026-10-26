@@ -1,18 +1,23 @@
 import { it, expect, vi } from "vitest";
 import { chromium } from "playwright";
 import { SearchPagesService } from "../src/services/search-pages.service.js";
-import { PortalLimit } from "../src/services/portal-limit.js";
+import { PortalLimit, PortalPacer } from "../src/services/portal-limit.js";
 import { querySchema } from "../src/types/card.types.js";
 
 it("pagina 20 itens sem buscar páginas futuras e compartilha chamadas simultâneas", async () => {
   let requests = 0;
+  let navigations = 0;
+  let blocked = false;
+  // Timing is covered with fake timers in portal-limit.test.ts.
+  const limit = new PortalLimit(600000, 0, new PortalPacer());
+  const pacing = vi.spyOn(limit, "beforeRequest");
   const cards = (start: number, end: number) =>
     Array.from(
       { length: end - start + 1 },
       (_, i) =>
         `<div class="mtg-single"><a href="https://www.ligapokemon.com.br/?view=cards/card&card=Pikachu+(${start + i}/100)&ed=TEST&num=${start + i}">Pikachu</a></div>`,
     ).join("");
-  const service = new SearchPagesService(new PortalLimit(), async () => {
+  const service = new SearchPagesService(limit, async () => {
     const browser = await chromium.launch();
     const newContext = browser.newContext.bind(browser);
     vi.spyOn(browser, "newContext").mockImplementation(async (options) => {
@@ -30,6 +35,12 @@ it("pagina 20 itens sem buscar páginas futuras e compartilha chamadas simultân
               },
             });
           }
+          navigations++;
+          if (blocked) return route.fulfill({
+            status: 403,
+            contentType: "text/html",
+            body: "<title>Attention Required!</title>",
+          });
           return route.fulfill({
             contentType: "text/html",
             body:
@@ -66,9 +77,19 @@ it("pagina 20 itens sem buscar páginas futuras e compartilha chamadas simultân
     expect(requests).toBe(2);
     expect(await service.next(second.nextCursor!)).toEqual(third);
     expect(requests).toBe(2);
+    expect(pacing).toHaveBeenCalledTimes(3); // Initial navigation and two POSTs.
     await expect(service.next("invalid")).rejects.toMatchObject({
       code: "SEARCH_EXPIRED",
     });
+    blocked = true;
+    await expect(service.first(querySchema.parse({ card: "Bulbasaur" }))).rejects.toMatchObject({
+      code: "PORTAL_BLOCKED",
+    });
+    const before = navigations;
+    await expect(service.first(querySchema.parse({ card: "Charmander" }))).rejects.toMatchObject({
+      code: "PORTAL_BLOCKED",
+    });
+    expect(navigations).toBe(before);
   } finally {
     await service.close();
   }

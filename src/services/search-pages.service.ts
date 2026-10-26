@@ -86,10 +86,12 @@ export class SearchPagesService {
       });
       const page = await context.newPage();
       page.setDefaultTimeout(15000);
+      await this.limit.beforeRequest();
       const response = await page.goto(buildCardUrl(query.card), {
         waitUntil: "domcontentloaded",
       });
       this.limit.check(response);
+      await this.limit.checkBlocked(page);
       if (!response?.ok())
         throw new ApiError(
           502,

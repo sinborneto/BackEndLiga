@@ -1,6 +1,6 @@
 # Consulta de preços — Liga Pokémon
 
-API REST Node.js 22+, TypeScript, Express, Playwright/Chromium e Zod. Projeto independente, sem precisar executar código no DevTools.
+API REST Node.js 22+, TypeScript, Express e Zod. Catálogo por HTTP direto (`fetch`), com alternativa Playwright/Chromium; ofertas e buscas paginadas com Playwright/Chromium. Projeto independente, sem precisar executar código no DevTools.
 
 ## Executar
 
@@ -18,10 +18,30 @@ Para produção local: `npm run build` e `npm start`. Verificações: `npm test`
 
 ### Catálogo de edições e cartas
 
-- `GET /api/editions`: lista completa publicada pela Liga, incluindo subconjuntos. Retorna `editions` com ID, sigla, nomes português/inglês, ano, data, edição principal (`parentId`), ícone e URL oficial. Cache de 1 hora.
-- `GET /api/editions/:id/cards`: retorna `edition`, `cards` e `collectedAt`. Cada carta informa nome português/inglês, número completo, raridade, energias, imagem, menor/maior preço anunciado e URL oficial. Cache de 10 minutos. IDs inválidos retornam 400; edições inexistentes, 404.
+- `GET /api/editions`: lista completa publicada pela Liga, incluindo subconjuntos. Retorna `editions` com ID, sigla, nomes português/inglês, ano, data, edição principal (`parentId`), ícone e URL oficial. Cache de 24 horas.
+- `GET /api/editions/:id/cards`: retorna `edition`, `cards` e `collectedAt`. Cada carta informa nome português/inglês, número completo, raridade, energias, imagem, menor/maior preço anunciado e URL oficial. Cache de 6 horas. IDs inválidos retornam 400; edições inexistentes, 404.
 
-O catálogo lê os dados JSON publicados nas páginas de edições e de busca por edição, sem executar textos extraídos como código. Carrega a edição completa, sem depender da primeira página ou das imagens visíveis. Rótulos dos filtros vêm da própria Liga; valores desconhecidos permanecem nulos. Preços do catálogo são referências do portal, sem coleta individual de estoque. Navegador separado com até duas páginas simultâneas, fila limitada e os mesmos limites de tempo das consultas.
+O catálogo tenta primeiro HTTP direto com `fetch`. Se houver falha de conexão, timeout, erro HTTP de servidor ou impossibilidade de ler os dados, faz uma tentativa alternativa com Playwright. Chamadas concorrentes compartilham a mesma coleta, incluindo a tentativa alternativa. Se ambos falharem, o cache em disco continua podendo fornecer os últimos dados salvos. Bloqueios identificados, limites de consultas e fila cheia interrompem a coleta sem tentar outro método; ambos respeitam a mesma pausa. HTTP direto também pode receber bloqueios: no teste de 26/10/2026, o portal respondeu 403 com “Just a moment…”.
+
+Os endpoints permanecem os mesmos. O cabeçalho `X-Catalog-Transport: http+playwright` identifica a estratégia configurada. O cliente HTTP aceita apenas HTTPS no host oficial, não segue redirecionamentos automaticamente e limita o tempo de resposta por `PAGE_TIMEOUT_MS`; a alternativa usa os limites de página e coleta do navegador. O Chromium só é iniciado se a alternativa for necessária e é encerrado junto com a API.
+
+- `POST /api/editions/:id/price-csv`: gera o CSV de importação de estoque da loja com os preços informados. Corpo `{ "rows": [...] }`, de 1 a 1000 linhas (limite de processamento da importação), cada uma com `cardId` (ID do catálogo, ex.: `804-48-018`), `language` (`PT`, `EN`, `PTEN`… ou vazio), `quality` (`M`…`D` ou vazio), `price` (> 0) e opcionalmente `existing`, `quantity` (coluna “Quantidade Para Somar/Subtrair”; `null` deixa em branco), `extras` (`foil`, `promo`, `reverseFoil`, `altered`… nas colunas `xls*`) e `stock` (padrão “Estoque Indefinido”). Cartas de outra edição retornam 400 `UNKNOWN_CARDS`. O arquivo reproduz o modelo exportado pela loja: UTF-8 sem BOM, CRLF entre registros, cabeçalho `xls*` e nomes de cartas sem acento (“Substituicao”, “Poke Tablet”). Conferido em 26/10/2026 com a exportação da 30C: as 152 linhas com preço foram regeneradas idênticas ao original.
+
+Se a Liga estiver indisponível, o CSV ainda pode ser gerado: cada linha pode trazer `card` (`name`, `nameEn`, `rarity`, `color`, copiados do CSV exportado pela loja) e o corpo, `edition` (`code`, `name`). Esses dados só são usados quando o catálogo falha (5xx); o ID da edição de cada carta continua validado.
+
+### Bloqueio da Liga, cache em disco e ritmo das consultas
+
+Se a Liga responder com a página de verificação do Cloudflare ("Attention Required", "Just a moment…"), a API retorna 503 `PORTAL_BLOCKED` e pausa **todas** as consultas ao portal por `PORTAL_BLOCK_COOLDOWN_MS` (padrão 10 minutos). Nenhuma tentativa de contorno é feita: nada de stealth, falsificação de assinatura, importação de cookies de outro navegador ou resolução de CAPTCHA.
+
+As coletas de ofertas reutilizam uma sessão do navegador em memória. Cookies definidos pelo portal permanecem durante a execução do processo. Cada coleta abre e fecha apenas sua página, inclusive no timeout, sem encerrar outras consultas. Não há persistência de sessão em disco. Isso evita criar uma sessão nova a cada coleta, mas não esconde o Playwright nem garante ausência de bloqueios. As buscas por nome continuam com sessões próprias para sua paginação. O catálogo usa HTTP direto como primeira opção e mantém uma sessão separada para a alternativa Playwright, sem transferir cookies entre os métodos.
+
+Edições (24 h), cartas por edição (6 h) e ofertas (`CACHE_TTL_MS`, até `CACHE_MAX` cartas) ficam salvas em `CACHE_DIR` (padrão `.cache/`) e sobrevivem a reinícios. Quando a Liga falha (bloqueio, timeout ou 5xx), a API devolve a última cópia salva: cartas com `stale` (data da cópia) e ofertas com um aviso em `diagnostics.messages`. Erros da própria consulta (404, 409) não usam cópia. `PORTAL_MIN_INTERVAL_MS` (padrão 1500) espaça as aberturas de página em todo o processo, reduzindo o volume de requisições.
+
+Os nomes das cartas do catálogo são decodificados das entidades HTML publicadas pela Liga (`Nidoran F&ecirc;mea` → `Nidoran Fêmea`).
+
+O intervalo é aplicado antes de cada navegação explícita e de cada clique em “Exibir mais”, em uma fila compartilhada entre catálogo, ofertas e buscas por nome. Recursos carregados pela própria página não passam por essa fila. Operações que aguardavam na fila verificam novamente o cooldown antes de acessar a Liga. Respostas 429 e 503 com `Retry-After` respeitam tanto segundos quanto datas HTTP, sem encurtar esperas superiores a uma hora; um novo aviso não reduz uma pausa já vigente. Isso reduz rajadas e respeita limites, mas não garante ausência de bloqueios. A fila e o cooldown valem por processo; várias instâncias precisam de coordenação externa.
+
+O catálogo lê os dados JSON publicados nas páginas de edições e de busca por edição. Os rótulos vêm dos literais dos filtros publicados no HTML, lidos com JSON5, sem executar os scripts. Carrega a edição completa, sem depender da primeira página ou das imagens visíveis. Valores desconhecidos permanecem nulos; filtros ausentes são tratados como catálogo indisponível. Preços do catálogo são referências do portal, sem coleta individual de estoque. Há até duas consultas HTTP simultâneas e vinte em espera. Validação local das capturas salvas: 811 edições e 158 cartas da 30C, todas com rótulo de raridade.
 
 Referências: [edições](https://www.ligapokemon.com.br/?view=cards/edicoes) e [cartas da 30C](https://www.ligapokemon.com.br/?view=cards/search&card=edid=804%20ed=30C). Conferência em 23/10/2026: 811 edições e 158 cartas da 30C; também verificadas BS, M6a, 30C-C e MEG. Totais sujeitos a mudanças no portal.
 
@@ -168,7 +188,7 @@ Lote válido retorna HTTP 200, inclusive se todas as cartas falharem. Cada item 
 
 Consultas equivalentes são deduplicadas por carta/número/edição (ignorando caixa e espaços extras); cada ocorrência recebe seus próprios filtros e resultado. O resumo conta ocorrências solicitadas, inclusive duplicatas, e soma suas ofertas. Diagnósticos descrevem a coleta completa antes dos filtros. O cache de 10 minutos é compartilhado com o endpoint individual; filtros não geram novas entradas e falhas não são armazenadas.
 
-Configuração: `BATCH_CONCURRENCY=3` limita consultas de lote simultâneas no processo, inclusive entre lotes; `MAX_PAGES=3` limita páginas globalmente, incluindo consultas individuais. O menor limite prevalece no scraping em lote. `BATCH_MAX_CARDS=20` configura itens por lote. `CARD_TIMEOUT_MS=60000` limita cada coleta após a criação da página; no timeout o contexto é fechado e libera a vaga. Espera em fila e inicialização do navegador são separadas. `PAGE_TIMEOUT_MS=45000` limita navegações e esperas. Use inteiros positivos. `CACHE_TTL_MS=600000` mantém o TTL atual.
+Configuração: `BATCH_CONCURRENCY=3` limita consultas de lote simultâneas no processo, inclusive entre lotes; `MAX_PAGES=3` limita páginas globalmente, incluindo consultas individuais. O menor limite prevalece no scraping em lote. `BATCH_MAX_CARDS=20` configura itens por lote. `CARD_TIMEOUT_MS=60000` limita cada coleta após a criação da página; no timeout a página é fechada e libera a vaga. Espera em fila e inicialização do navegador são separadas. `PAGE_TIMEOUT_MS=45000` limita navegações e esperas. Use inteiros positivos. `CACHE_TTL_MS=600000` mantém o TTL atual.
 
 Verificações locais: `npm test`, `npm run build`, `npm run lint`. Integração HTTP manual: `npx tsx scripts/live-batch.ts`, que consulta Articuno e Chandelure e salva `artifacts/live-batch-result.json` com resultados e duração reais.
 
@@ -197,7 +217,7 @@ O filtro `quality` aceita múltiplas condições separadas por vírgula, por exe
 
 Condições (`quality`): `1 → M`, `2 → NM`, `3 → SP`, `4 → MP`, `5 → HP`, `6 → D`; `0 → Não definida`. Mapeamento confirmado em 23/10/2026 nos seletores `#collection_quality` e `#bazar_quality` do portal, usando Pikachu (12/17) como referência para HP. O código bruto continua em `qualityCode` e códigos desconhecidos retornam `null`. O filtro `quality` aceita as siglas, sem diferenciar maiúsculas e minúsculas, tanto na consulta individual quanto no lote.
 
-Chromium reutilizado; contexto isolado por coleta; três páginas simultâneas por padrão; fila limitada; cache de até 200 consultas; TTL 10 minutos; consultas concorrentes à mesma carta compartilham a coleta; filtros aplicados depois do cache. Rate limit: 30 requisições/minuto/IP. Não configure confiança em proxy sem conhecer a infraestrutura. SIGINT/SIGTERM encerram o servidor e o navegador.
+Chromium e sessão reutilizados por pool; página separada por coleta; três páginas simultâneas por padrão; fila limitada; cache de até 200 consultas; TTL 10 minutos; consultas concorrentes à mesma carta compartilham a coleta; filtros aplicados depois do cache. Rate limit: 30 requisições/minuto/IP. Não configure confiança em proxy sem conhecer a infraestrutura. SIGINT/SIGTERM encerram o servidor e o navegador.
 
 Variáveis em `.env.example`: porta, TTL, limite de páginas, timeout de navegação/espera e caminho dos perfis. Use valores positivos. Execute a partir da raiz do projeto para carregar os arquivos JSON de calibração.
 

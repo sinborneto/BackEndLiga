@@ -65,6 +65,7 @@ export async function resolveCard(
   limit = new PortalLimit(),
   loadAll = true,
 ) {
+  await limit.checkBlocked(page);
   if (loadAll) await loadCandidatePages(page, limit);
   const data = await page.evaluate(() => ({
     title: document.title,
@@ -177,7 +178,10 @@ export async function resolveCard(
       (c) => !q.edition || c.edition.toLowerCase() === q.edition.toLowerCase(),
     );
     if (matching.length === 1 && matching[0].kind === "card") {
-      await page.goto(matching[0].url, { waitUntil: "domcontentloaded" });
+      await limit.beforeRequest();
+      const response = await page.goto(matching[0].url, { waitUntil: "domcontentloaded" });
+      limit.check(response);
+      await limit.checkBlocked(page);
     } else if (relevant.length)
       throw new ApiError(
         409,
@@ -261,6 +265,7 @@ export async function loadCandidatePages(
         "SEARCH_TOO_BROAD",
         "Refine a busca por nome, número ou edição.",
       );
+    await limit.beforeRequest();
     const previous = await page.evaluate(
       () =>
         (window as unknown as { mcards?: { page: number } }).mcards?.page ?? 0,
